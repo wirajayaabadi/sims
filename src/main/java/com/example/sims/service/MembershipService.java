@@ -19,17 +19,48 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CompletedPart;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Vector;
 
 @Service
 public class MembershipService {
 
   @Value("${file.upload-dir}")
   private String UPLOAD_DIR;
+
+  @Value("${sufy-access-key}")
+  private String SUFY_ACCESS_KEY;
+
+  @Value("${sufy-url-source}")
+  private String SUFY_URL_SOURCE;
+
+  @Value("${sufy-secret-key}")
+  private String SUFY_SECRET_KEY;
+
+  @Value("${sufy-bucket}")
+  private String SUFY_BUCKET;
+
+  @Value("${sufy-bucket-key}")
+  private String SUFY_BUCKET_KEY;
+
+  @Value("${sufy-image-url}")
+  private String SUFY_IMAGE_URL;
 
   @Autowired
   private UserRepository userRepository;
@@ -102,14 +133,28 @@ public class MembershipService {
     if(file.isEmpty()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File tidak diupload");
     }
-    String email = jwtUtil.getEmailFromToken(request);
 
+    String email = jwtUtil.getEmailFromToken(request);
     String fileName = file.getOriginalFilename();
-    Path targetLocation = Paths.get(UPLOAD_DIR + fileName);
-    String url = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString() + UPLOAD_DIR + fileName;
+    String url = SUFY_IMAGE_URL + UPLOAD_DIR + fileName;
+
+    final S3Client s3 = S3Client.builder().region(Region.of("ap-southeast-2"))
+            .endpointOverride(URI.create(SUFY_URL_SOURCE))
+            .credentialsProvider(
+                    StaticCredentialsProvider.create(
+                            AwsBasicCredentials.create(SUFY_ACCESS_KEY, SUFY_SECRET_KEY)))
+            .build();
+    String bucketName = SUFY_BUCKET;
+    String keyName = UPLOAD_DIR + fileName;
+
     try {
-      Files.createDirectories(targetLocation.getParent());
-      file.transferTo(targetLocation.toFile());
+      PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+              .bucket(bucketName)
+              .key(keyName)
+              .build();
+
+      s3.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+
       User user = userRepository.findByEmail(email)
               .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email tidak ditemukan"));
       user.setProfileImage(url);
