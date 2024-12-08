@@ -14,14 +14,19 @@ public class InvoiceGenerator {
 
   public String generateInvoiceNumber(HistoryTransaction history) {
     String date = new SimpleDateFormat("ddMMyyyy").format(new Date());
-    String lastGenerated = new SimpleDateFormat("ddMMyyyy").format(history.getCreatedOn());
-    if(!date.equals(lastGenerated)) {
+    if(history == null) {
       counter.set(0);
     } else {
-      String[] parts = history.getInvoiceNumber().split("-");
-      int counterSet = Integer.valueOf(parts[1]);
-      counter.set(counterSet);
+      String lastGenerated = new SimpleDateFormat("ddMMyyyy").format(history.getCreatedOn());
+      if(!date.equals(lastGenerated)) {
+        counter.set(0);
+      } else {
+        String[] parts = history.getInvoiceNumber().split("-");
+        int counterSet = Integer.valueOf(parts[1]);
+        counter.set(counterSet);
+      }
     }
+
     int sequence = counter.incrementAndGet();
     String formattedSequence = String.format("%03d", sequence);
 

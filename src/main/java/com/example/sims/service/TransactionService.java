@@ -110,6 +110,9 @@ public class TransactionService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email tidak ditemukan"));
 
     Balance balance = balanceRepository.findByUserId(user.getId());
+    if(balance.getBalance() < service.getServiceTariff()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Saldo anda tidak mencukupi.");
+    }
     balance.setBalance(balance.getBalance() - service.getServiceTariff());
     balance = balanceRepository.save(balance);
 
